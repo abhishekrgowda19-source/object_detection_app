@@ -1,0 +1,10 @@
+flask
+ultralytics
+opencv-python
+pillow
+yt-dlp
+numpy
+deepface
+torch
+reportlab
+gunicorn

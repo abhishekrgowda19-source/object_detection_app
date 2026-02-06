@@ -1,0 +1,12 @@
+venv/
+venv310/
+backend/venv/
+backend/venv310/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+uploads/
+dist/
+build/
+*.exe

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VideoGPT – Video Understanding AI</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <h1>🎥 VideoGPT</h1>
+    <p>AI-powered Video Understanding & Question Answering</p>
+
+    <!-- ================= VIDEO LINK ================= -->
+    <h3>Analyze Video from Link 🔗</h3>
+    <div style="margin-bottom: 20px;">
+        <input 
+            type="text"
+            id="videoLink"
+            placeholder="Paste public video link (YouTube supported)"
+            style="width:60%; padding:10px; border-radius:20px; border:none;"
+        >
+        <button type="button" onclick="processLink()">Analyze Link</button>
+    </div>
+
+    <hr style="width:60%; opacity:0.3;">
+
+    <!-- ================= UPLOAD ================= -->
+    <h3>Upload Image / Video 📁</h3>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input 
+            type="file" 
+            id="fileInput" 
+            name="file" 
+            accept="image/*,video/*" 
+            required
+        >
+        <button type="submit">Upload & Analyze</button>
+    </form>
+
+    <!-- ================= RESULT ================= -->
+    <h3>Detection Result</h3>
+    <div id="result"></div>
+
+    <!-- ================= CHATBOT ================= -->
+    <h3>Ask VideoGPT 🤖</h3>
+    <div id="chatbox">
+        <div id="chatMessages"></div>
+
+        <input
+            type="text"
+            id="userQuestion"
+            placeholder="Ask: How many people? What objects are inside?"
+        >
+        <button type="button" onclick="askBot()">Ask</button>
+    </div>
+
+    <!-- ================= FOOTER ================= -->
+    <footer class="footer">
+        Developed by <strong>Abhishek</strong> | Powered by <strong>GemSyn</strong>
+    </footer>
+
+    <!-- ================= JS ================= -->
+    <script src="js/script.js"></script>
+
+</body>
+</html>

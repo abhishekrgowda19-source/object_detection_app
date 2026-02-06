@@ -1,0 +1,231 @@
+/* ================= BASE STYLES ================= */
+
+body {
+    background-color: #0b0f2b;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    animation: fadeIn 1.2s ease-in-out;
+    padding: 0 10px;
+}
+
+h1 {
+    color: orange;
+    margin-bottom: 10px;
+    font-size: 36px;
+}
+
+h3 {
+    margin-top: 25px;
+    color: #00c6ff;
+}
+
+p {
+    color: #ccc;
+    font-size: 14px;
+}
+
+form {
+    margin: 20px auto;
+}
+
+input[type="file"] {
+    margin: 10px;
+}
+
+/* ================= BUTTONS ================= */
+
+button {
+    background-color: #00c6ff;
+    color: black;
+    padding: 10px 25px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+    background-color: #00a0cc;
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(0, 198, 255, 0.8);
+}
+
+button:active {
+    transform: scale(0.96);
+}
+
+/* ================= PREVIEW & RESULT ================= */
+
+#preview, #result {
+    margin: 15px auto;
+    padding: 12px;
+    border: 2px solid cyan;
+    width: 60%;
+    min-height: 100px;
+    animation: glowPulse 3s infinite ease-in-out;
+}
+
+/* ================= TIMELINE HIGHLIGHTS ================= */
+
+#highlights {
+    width: 60%;
+    margin: 15px auto;
+    padding: 10px;
+    border: 1px dashed #00c6ff;
+    background-color: #11163a;
+    border-radius: 10px;
+    text-align: left;
+}
+
+#highlights p {
+    margin: 6px 0;
+    font-size: 14px;
+}
+
+#highlights b {
+    color: #00c6ff;
+}
+
+/* ================= CHATBOX ================= */
+
+#chatbox {
+    margin: 30px auto;
+    padding: 15px;
+    width: 400px;
+    max-width: 95%;
+    background-color: #11163a;
+    border: 2px solid #00c6ff;
+    border-radius: 15px;
+    box-shadow: 0 0 15px rgba(0, 198, 255, 0.3);
+}
+
+#chatMessages {
+    height: 160px;
+    overflow-y: auto;
+    background-color: #0b0f2b;
+    border: 1px solid #00c6ff;
+    border-radius: 10px;
+    padding: 8px;
+    margin-bottom: 10px;
+    text-align: left;
+    font-size: 14px;
+    word-wrap: break-word;
+}
+
+#chatMessages p {
+    margin: 6px 0;
+    animation: slideIn 0.4s ease-in-out;
+}
+
+#chatMessages b {
+    color: #00c6ff;
+}
+
+#userQuestion {
+    width: 70%;
+    padding: 8px 12px;
+    border-radius: 20px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+}
+
+#chatbox button {
+    padding: 8px 18px;
+    margin-left: 5px;
+    border-radius: 20px;
+    background-color: orange;
+    color: black;
+    font-weight: bold;
+}
+
+#chatbox button:hover {
+    background-color: #ff9f00;
+}
+
+/* ================= BOT TYPING ================= */
+
+.typing {
+    margin-top: 10px;
+    font-style: italic;
+    color: #aaa;
+    animation: blink 1.5s infinite;
+}
+
+/* ================= AUDIO & PDF BUTTON ================= */
+
+.audio-btn {
+    display: inline-block;
+    margin: 10px 5px;
+    padding: 8px 20px;
+    background-color: #ff9f00;
+    color: black;
+    border-radius: 20px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.audio-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(255, 159, 0, 0.8);
+}
+
+/* ================= FOOTER ================= */
+
+.footer {
+    margin-top: 40px;
+    padding: 15px 0;
+    color: #aaa;
+    font-size: 14px;
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    animation: fadeFooter 2s ease-in-out;
+}
+
+.footer strong {
+    color: #00c6ff;
+}
+
+/* ================= ANIMATIONS ================= */
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glowPulse {
+    0% { box-shadow: 0 0 8px rgba(0, 198, 255, 0.2); }
+    50% { box-shadow: 0 0 18px rgba(0, 198, 255, 0.5); }
+    100% { box-shadow: 0 0 8px rgba(0, 198, 255, 0.2); }
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeFooter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes blink {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 600px) {
+    #preview, #result, #highlights {
+        width: 95%;
+    }
+
+    h1 {
+        font-size: 28px;
+    }
+}
