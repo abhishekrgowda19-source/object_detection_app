@@ -2,6 +2,7 @@ from flask import Flask, request, send_from_directory, jsonify
 from ultralytics import YOLO
 import os
 import cv2
+import gc
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from werkzeug.utils import secure_filename
@@ -41,7 +42,7 @@ print("YOLO loaded successfully")
 
 video_summary = {}
 
-# ================= GENDER (FIXED LAZY LOAD) =================
+# ================= GENDER (LAZY LOAD) =================
 
 def detect_gender(crop):
 
@@ -50,7 +51,6 @@ def detect_gender(crop):
         if crop is None or crop.size == 0:
             return None
 
-        # Lazy import (VERY IMPORTANT)
         from deepface import DeepFace
 
         result = DeepFace.analyze(
@@ -66,7 +66,6 @@ def detect_gender(crop):
 
         print("Gender error:", e)
         return None
-
 
 # ================= SUMMARY =================
 
@@ -202,8 +201,7 @@ def process_image(path):
         "content_summary":summary
     })
 
-
-# ================= VIDEO (FIXED FOR RENDER MEMORY) =================
+# ================= VIDEO (ULTRA SAFE FOR RENDER) =================
 
 def process_video(path):
 
@@ -217,7 +215,7 @@ def process_video(path):
 
     frame_count = 0
 
-    print("Processing video lightweight...")
+    print("Processing video ultra lightweight...")
 
     while True:
 
@@ -228,9 +226,11 @@ def process_video(path):
 
         frame_count += 1
 
-        # Reduce load (IMPORTANT)
-        if frame_count % 30 != 0:
+        # PROCESS ONLY EVERY 60th FRAME
+        if frame_count % 60 != 0:
             continue
+
+        gc.collect()
 
         results = model(frame, conf=0.25, device="cpu")
 
