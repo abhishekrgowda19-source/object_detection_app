@@ -1,12 +1,34 @@
+# Virtual environments
 venv/
 venv310/
 backend/venv/
 backend/venv310/
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Uploads (temporary files)
 uploads/
+
+# Build files
 dist/
 build/
+
+# Executables
 *.exe
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings (optional)
+.vscode/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
