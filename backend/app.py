@@ -12,7 +12,7 @@ from deepface import DeepFace
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# FIXED: frontend inside backend
+# frontend folder inside backend
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -24,7 +24,11 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ================= APP =================
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder=FRONTEND_DIR,
+    static_url_path=""
+)
 
 
 # ================= LOAD YOLO =================
@@ -39,17 +43,21 @@ print("YOLO loaded successfully")
 video_summary = {}
 
 
-# ================= GENDER DETECTION =================
+# ================= SAFE GENDER DETECTION =================
 
 def detect_gender(crop):
 
     try:
+        if crop is None or crop.size == 0:
+            return None
+
         result = DeepFace.analyze(
             crop,
             actions=['gender'],
             enforce_detection=False,
             silent=True
         )
+
         return result[0]["dominant_gender"]
 
     except:
@@ -92,7 +100,7 @@ def generate_scene_summary(male, female, object_freq):
     return summary
 
 
-# ================= FRONTEND ROUTES =================
+# ================= FRONTEND =================
 
 @app.route("/")
 def home():
@@ -114,7 +122,7 @@ def serve_uploads(path):
     return send_from_directory(UPLOAD_DIR, path)
 
 
-# IMPORTANT fallback route
+# fallback route (IMPORTANT for Render)
 @app.route("/<path:path>")
 def serve_static(path):
     return send_from_directory(FRONTEND_DIR, path)
@@ -129,6 +137,9 @@ def process():
         return jsonify({"error": "No file uploaded"})
 
     file = request.files["file"]
+
+    if file.filename == "":
+        return jsonify({"error": "No filename"})
 
     filename = secure_filename(file.filename)
 
@@ -148,6 +159,9 @@ def process_image(path):
 
     frame = cv2.imread(path)
 
+    if frame is None:
+        return jsonify({"error": "Invalid image"})
+
     results = model(frame, conf=0.25)
 
     male_ids = set()
@@ -155,14 +169,14 @@ def process_image(path):
 
     object_freq = {}
 
-    if results[0].boxes is not None:
+    if results and results[0].boxes is not None:
 
         for box in results[0].boxes:
 
             cls_id = int(box.cls[0])
             name = model.names[cls_id]
 
-            object_freq[name] = object_freq.get(name,0)+1
+            object_freq[name] = object_freq.get(name, 0) + 1
 
             if name == "person":
 
@@ -193,7 +207,7 @@ def process_image(path):
     })
 
 
-# ================= VIDEO WITH TRACKING =================
+# ================= VIDEO TRACKING =================
 
 def process_video(path):
 
@@ -204,6 +218,8 @@ def process_video(path):
     all_ids = set()
 
     object_freq = {}
+
+    print("Processing video with tracking...")
 
     results = model.track(
         source=path,
@@ -268,6 +284,8 @@ def process_video(path):
         "visual_objects": list(object_freq.keys()),
         "content_summary": summary
     }
+
+    print("Tracking completed")
 
     return jsonify(video_summary)
 
