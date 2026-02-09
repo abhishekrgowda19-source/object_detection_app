@@ -27,7 +27,6 @@ app = Flask(
     static_url_path=""
 )
 
-# Allow large uploads (200MB)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 
 # ================= LOAD YOLO =================
@@ -35,15 +34,15 @@ app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 print("Loading YOLO model...")
 
 model = YOLO(MODEL_PATH)
-model.to("cpu")   # IMPORTANT for Render
+model.to("cpu")
 
 print("YOLO loaded successfully")
 
-# ================= GLOBAL STATE =================
+# ================= GLOBAL =================
 
 video_summary = {}
 
-# ================= SAFE GENDER DETECTION =================
+# ================= GENDER =================
 
 def detect_gender(crop):
 
@@ -63,9 +62,8 @@ def detect_gender(crop):
 
     except Exception as e:
 
-        print("Gender detection error:", e)
+        print("Gender error:", e)
         return None
-
 
 # ================= SUMMARY =================
 
@@ -82,53 +80,45 @@ def generate_scene_summary(male, female, object_freq):
     objects = [obj for obj, count in sorted_objects[:5]]
 
     if "laptop" in objects or "cell phone" in objects:
-        environment = "a workspace or office environment"
+        env = "a workspace or office environment"
 
     elif "dining table" in objects:
-        environment = "a dining or living area"
+        env = "a dining or living area"
 
     elif "dog" in objects:
-        environment = "a home environment"
+        env = "a home environment"
 
     else:
-        environment = "an indoor environment"
+        env = "an indoor environment"
 
-    summary = (
-        f"The video shows {environment}. "
-        f"There are approximately {total} unique people present "
+    return (
+        f"The video shows {env}. "
+        f"There are approximately {total} people "
         f"({male} males and {female} females). "
         f"Common objects include {', '.join(objects)}."
     )
 
-    return summary
-
-
-# ================= FRONTEND =================
+# ================= ROUTES =================
 
 @app.route("/")
 def home():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
-
 @app.route("/css/<path:path>")
-def serve_css(path):
-    return send_from_directory(os.path.join(FRONTEND_DIR, "css"), path)
-
+def css(path):
+    return send_from_directory(os.path.join(FRONTEND_DIR,"css"), path)
 
 @app.route("/js/<path:path>")
-def serve_js(path):
-    return send_from_directory(os.path.join(FRONTEND_DIR, "js"), path)
-
+def js(path):
+    return send_from_directory(os.path.join(FRONTEND_DIR,"js"), path)
 
 @app.route("/uploads/<path:path>")
-def serve_uploads(path):
+def uploads(path):
     return send_from_directory(UPLOAD_DIR, path)
 
-
 @app.route("/<path:path>")
-def serve_static(path):
+def static_files(path):
     return send_from_directory(FRONTEND_DIR, path)
-
 
 # ================= PROCESS =================
 
@@ -138,12 +128,12 @@ def process():
     try:
 
         if "file" not in request.files:
-            return jsonify({"error": "No file uploaded"})
+            return jsonify({"error":"No file"})
 
         file = request.files["file"]
 
         if file.filename == "":
-            return jsonify({"error": "No filename"})
+            return jsonify({"error":"Empty filename"})
 
         filename = secure_filename(file.filename)
 
@@ -151,7 +141,7 @@ def process():
 
         file.save(path)
 
-        print("Saved file:", path)
+        print("Saved:", path)
 
         if filename.lower().endswith((".jpg",".jpeg",".png",".webp")):
             return process_image(path)
@@ -160,159 +150,123 @@ def process():
 
     except Exception as e:
 
-        print("PROCESS ERROR:", str(e))
-        return jsonify({"error": str(e)})
-
+        print("Process error:", e)
+        return jsonify({"error":str(e)})
 
 # ================= IMAGE =================
 
 def process_image(path):
 
-    try:
+    frame = cv2.imread(path)
 
-        frame = cv2.imread(path)
+    if frame is None:
+        return jsonify({"error":"Invalid image"})
 
-        if frame is None:
-            return jsonify({"error": "Invalid image"})
+    results = model(frame, conf=0.25, device="cpu")
 
-        results = model(frame, conf=0.25, device="cpu")
+    male = 0
+    female = 0
+    object_freq = {}
 
-        male_ids = set()
-        female_ids = set()
+    for box in results[0].boxes:
 
-        object_freq = {}
+        cls = int(box.cls[0])
+        name = model.names[cls]
 
-        if results and results[0].boxes is not None:
+        object_freq[name] = object_freq.get(name,0)+1
 
-            for box in results[0].boxes:
+        if name == "person":
 
-                cls_id = int(box.cls[0])
-                name = model.names[cls_id]
+            x1,y1,x2,y2 = map(int, box.xyxy[0])
 
-                object_freq[name] = object_freq.get(name, 0) + 1
+            crop = frame[y1:y2, x1:x2]
 
-                if name == "person":
+            gender = detect_gender(crop)
 
-                    x1,y1,x2,y2 = map(int, box.xyxy[0])
+            if gender == "Man":
+                male += 1
 
-                    crop = frame[y1:y2, x1:x2]
+            elif gender == "Woman":
+                female += 1
 
-                    gender = detect_gender(crop)
+    summary = generate_scene_summary(male,female,object_freq)
 
-                    if gender == "Man":
-                        male_ids.add(id(box))
+    return jsonify({
+        "male":male,
+        "female":female,
+        "unique_people":male+female,
+        "visual_objects":list(object_freq.keys()),
+        "content_summary":summary
+    })
 
-                    elif gender == "Woman":
-                        female_ids.add(id(box))
-
-        male = len(male_ids)
-        female = len(female_ids)
-
-        summary = generate_scene_summary(male,female,object_freq)
-
-        return jsonify({
-            "male": male,
-            "female": female,
-            "unique_people": male+female,
-            "visual_objects": list(object_freq.keys()),
-            "content_summary": summary
-        })
-
-    except Exception as e:
-
-        print("Image processing error:", e)
-        return jsonify({"error": str(e)})
-
-
-# ================= VIDEO =================
+# ================= VIDEO (FIXED LIGHTWEIGHT VERSION) =================
 
 def process_video(path):
 
     global video_summary
 
-    try:
+    cap = cv2.VideoCapture(path)
 
-        male_ids = set()
-        female_ids = set()
-        all_ids = set()
+    male = 0
+    female = 0
+    object_freq = {}
 
-        object_freq = {}
+    frame_count = 0
 
-        print("Processing video:", path)
+    print("Processing video lightweight...")
 
-        results = model.track(
-            source=path,
-            conf=0.25,
-            persist=True,
-            stream=True,
-            tracker="bytetrack.yaml",
-            device="cpu"
-        )
+    while True:
 
-        for r in results:
+        ret, frame = cap.read()
 
-            if r.boxes is None:
+        if not ret:
+            break
+
+        frame_count += 1
+
+        # process every 10th frame only
+        if frame_count % 10 != 0:
+            continue
+
+        results = model(frame, conf=0.25, device="cpu")
+
+        for box in results[0].boxes:
+
+            cls = int(box.cls[0])
+            name = model.names[cls]
+
+            object_freq[name] = object_freq.get(name,0)+1
+
+            if name != "person":
                 continue
 
-            frame = r.orig_img
+            x1,y1,x2,y2 = map(int, box.xyxy[0])
 
-            boxes = r.boxes.xyxy.cpu().numpy()
-            classes = r.boxes.cls.cpu().numpy()
-            ids = r.boxes.id
+            crop = frame[y1:y2, x1:x2]
 
-            if ids is None:
-                continue
+            gender = detect_gender(crop)
 
-            ids = ids.cpu().numpy()
+            if gender == "Man":
+                male += 1
 
-            for box, cls_id, track_id in zip(boxes, classes, ids):
+            elif gender == "Woman":
+                female += 1
 
-                name = model.names[int(cls_id)]
+    cap.release()
 
-                object_freq[name] = object_freq.get(name,0)+1
+    summary = generate_scene_summary(male,female,object_freq)
 
-                if name != "person":
-                    continue
+    video_summary = {
+        "male":male,
+        "female":female,
+        "unique_people":male+female,
+        "visual_objects":list(object_freq.keys()),
+        "content_summary":summary
+    }
 
-                if track_id in all_ids:
-                    continue
+    print("Video done")
 
-                x1,y1,x2,y2 = map(int, box)
-
-                crop = frame[y1:y2, x1:x2]
-
-                gender = detect_gender(crop)
-
-                if gender == "Man":
-                    male_ids.add(track_id)
-                    all_ids.add(track_id)
-
-                elif gender == "Woman":
-                    female_ids.add(track_id)
-                    all_ids.add(track_id)
-
-        male = len(male_ids)
-        female = len(female_ids)
-
-        summary = generate_scene_summary(male,female,object_freq)
-
-        video_summary = {
-            "male": male,
-            "female": female,
-            "unique_people": male+female,
-            "visual_objects": list(object_freq.keys()),
-            "content_summary": summary
-        }
-
-        print("Video processing completed")
-
-        return jsonify(video_summary)
-
-    except Exception as e:
-
-        print("VIDEO ERROR:", str(e))
-        return jsonify({"error": str(e)})
-
+    return jsonify(video_summary)
 
 # ================= CHAT =================
 
@@ -324,15 +278,14 @@ def chat():
 
     return jsonify({"reply":video_summary["content_summary"]})
 
-
 # ================= PDF =================
 
 @app.route("/export_pdf")
 def export_pdf():
 
-    pdf_path = os.path.join(UPLOAD_DIR,"report.pdf")
+    path = os.path.join(UPLOAD_DIR,"report.pdf")
 
-    c = canvas.Canvas(pdf_path,pagesize=A4)
+    c = canvas.Canvas(path,pagesize=A4)
 
     c.drawString(50,800,"VideoGPT Report")
     c.drawString(50,760,video_summary.get("content_summary",""))
@@ -341,15 +294,10 @@ def export_pdf():
 
     return send_from_directory(UPLOAD_DIR,"report.pdf",as_attachment=True)
 
-
 # ================= RUN =================
 
 if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT",10000))
 
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    app.run(host="0.0.0.0",port=port)
