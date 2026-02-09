@@ -5,7 +5,6 @@ import cv2
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from werkzeug.utils import secure_filename
-from deepface import DeepFace
 
 # ================= PATHS =================
 
@@ -42,7 +41,7 @@ print("YOLO loaded successfully")
 
 video_summary = {}
 
-# ================= GENDER =================
+# ================= GENDER (FIXED LAZY LOAD) =================
 
 def detect_gender(crop):
 
@@ -50,6 +49,9 @@ def detect_gender(crop):
 
         if crop is None or crop.size == 0:
             return None
+
+        # Lazy import (VERY IMPORTANT)
+        from deepface import DeepFace
 
         result = DeepFace.analyze(
             crop,
@@ -64,6 +66,7 @@ def detect_gender(crop):
 
         print("Gender error:", e)
         return None
+
 
 # ================= SUMMARY =================
 
@@ -199,7 +202,8 @@ def process_image(path):
         "content_summary":summary
     })
 
-# ================= VIDEO (FIXED LIGHTWEIGHT VERSION) =================
+
+# ================= VIDEO (FIXED FOR RENDER MEMORY) =================
 
 def process_video(path):
 
@@ -224,8 +228,8 @@ def process_video(path):
 
         frame_count += 1
 
-        # process every 10th frame only
-        if frame_count % 10 != 0:
+        # Reduce load (IMPORTANT)
+        if frame_count % 30 != 0:
             continue
 
         results = model(frame, conf=0.25, device="cpu")
