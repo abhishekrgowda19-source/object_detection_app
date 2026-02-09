@@ -9,24 +9,36 @@ from reportlab.pdfgen import canvas
 from werkzeug.utils import secure_filename
 from deepface import DeepFace
 
+
 # ================= PATHS =================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
+
+# FIXED: frontend inside backend folder
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+
+MODEL_PATH = os.path.join(BASE_DIR, "yolov8s.pt")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ================= APP =================
 
-app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
+app = Flask(
+    __name__,
+    static_folder=FRONTEND_DIR,
+    static_url_path=""
+)
 
 
 # ================= LOAD YOLO =================
 
 print("Loading YOLO model...")
-model = YOLO("yolov8s.pt")
+
+model = YOLO(MODEL_PATH)
+
 print("YOLO loaded successfully")
 
 
@@ -104,16 +116,26 @@ def generate_scene_summary(male, female, object_freq):
     return summary
 
 
-# ================= FRONTEND =================
+# ================= FRONTEND ROUTES =================
 
 @app.route("/")
 def home():
-    return app.send_static_file("index.html")
+    return send_from_directory(FRONTEND_DIR, "index.html")
 
 
-@app.route("/uploads/<path:p>")
-def uploads(p):
-    return send_from_directory(UPLOAD_DIR, p)
+@app.route("/css/<path:path>")
+def serve_css(path):
+    return send_from_directory(os.path.join(FRONTEND_DIR, "css"), path)
+
+
+@app.route("/js/<path:path>")
+def serve_js(path):
+    return send_from_directory(os.path.join(FRONTEND_DIR, "js"), path)
+
+
+@app.route("/uploads/<path:path>")
+def serve_uploads(path):
+    return send_from_directory(UPLOAD_DIR, path)
 
 
 # ================= PROCESS ROUTE =================
@@ -132,6 +154,11 @@ def process():
 
     file.save(path)
 
+    valid, error = validate_file(path)
+
+    if not valid:
+        return jsonify({"error": error})
+
     if filename.lower().endswith((".jpg",".png",".jpeg",".webp")):
         return process_image(path)
 
@@ -143,6 +170,9 @@ def process():
 def process_image(path):
 
     frame = cv2.imread(path)
+
+    if frame is None:
+        return jsonify({"error": "Cannot read image"})
 
     results = model(frame, conf=0.25)
 
@@ -265,8 +295,7 @@ def process_video(path):
         "female": female,
         "unique_people": male+female,
         "visual_objects": list(object_freq.keys()),
-        "content_summary": summary,
-        "download_video": f"/uploads/{os.path.basename(path)}"
+        "content_summary": summary
 
     }
 
@@ -296,6 +325,7 @@ def export_pdf():
     c = canvas.Canvas(pdf_path,pagesize=A4)
 
     c.drawString(50,800,"VideoGPT Report")
+
     c.drawString(50,760,video_summary.get("content_summary",""))
 
     c.save()
@@ -314,4 +344,3 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
-
