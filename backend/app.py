@@ -20,12 +20,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ================= APP =================
 
-app = Flask(
-    __name__,
-    static_folder=FRONTEND_DIR,
-    static_url_path=""
-)
-
+app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 
 # ================= LOAD MODEL =================
@@ -79,7 +74,7 @@ def generate_scene_summary(male, female, object_freq):
 
     objects = [obj for obj, count in sorted_objects[:5]]
 
-    if "laptop" in objects or "cell phone" in objects:
+    if "laptop" in objects:
         env = "a workspace or office environment"
 
     elif "dining table" in objects:
@@ -98,8 +93,7 @@ def generate_scene_summary(male, female, object_freq):
         f"Common objects include {', '.join(objects)}."
     )
 
-
-# ================= FRONTEND ROUTES =================
+# ================= FRONTEND =================
 
 @app.route("/")
 def home():
@@ -128,9 +122,6 @@ def process():
 
         file = request.files["file"]
 
-        if file.filename == "":
-            return jsonify({"error": "Empty filename"}), 400
-
         filename = secure_filename(file.filename)
 
         path = os.path.join(UPLOAD_DIR, filename)
@@ -139,7 +130,7 @@ def process():
 
         print("File saved:", path)
 
-        if filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+        if filename.lower().endswith((".jpg", ".jpeg", ".png")):
             return process_image(path)
 
         return process_video(path)
@@ -147,75 +138,48 @@ def process():
     except Exception as e:
 
         print("Process error:", e)
-
         return jsonify({"error": str(e)}), 500
 
 
-# ================= YOUTUBE PROCESS (RENDER SAFE FINAL VERSION) =================
+# ================= FIXED YOUTUBE PROCESS =================
 
 @app.route("/process_link", methods=["POST"])
 def process_link():
 
     try:
 
-        data = request.get_json(force=True)
+        data = request.get_json()
 
         if not data or "url" not in data:
             return jsonify({"error": "No URL provided"}), 400
 
-        url = data["url"].strip()
+        url = data["url"]
 
-        print("Downloading YouTube:", url)
-
-        output_path = os.path.join(UPLOAD_DIR, "youtube.mp4")
-
-        if os.path.exists(output_path):
-            os.remove(output_path)
+        print("Extracting YouTube stream URL...")
 
         ydl_opts = {
-
-            "format": "worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst",
-
-            "outtmpl": output_path,
-
-            "quiet": False,
-
-            "nocheckcertificate": True,
-
-            "ignoreerrors": False,
-
-            "no_warnings": False,
-
+            "quiet": True,
             "noplaylist": True,
-
-            "retries": 5,
-
-            "fragment_retries": 5,
-
-            "http_chunk_size": 1048576,
-
-            "socket_timeout": 30
-
+            "format": "worst",
+            "skip_download": True
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
 
-        if not os.path.exists(output_path):
-            return jsonify({
-                "error": "Download failed"
-            }), 500
+            info = ydl.extract_info(url, download=False)
 
-        print("Download successful")
+            stream_url = info["url"]
 
-        return process_video(output_path)
+        print("Stream extracted")
+
+        return process_video_stream(stream_url)
 
     except Exception as e:
 
-        print("FULL YouTube error:", str(e))
+        print("YouTube error:", e)
 
         return jsonify({
-            "error": "YouTube download failed",
+            "error": "YouTube blocked cloud server",
             "details": str(e)
         }), 500
 
@@ -226,14 +190,11 @@ def process_image(path):
 
     frame = cv2.imread(path)
 
-    if frame is None:
-        return jsonify({"error": "Invalid image"}), 400
-
-    results = model(frame, conf=0.25)
-
     male = 0
     female = 0
     object_freq = {}
+
+    results = model(frame, conf=0.25)
 
     for box in results[0].boxes:
 
@@ -244,7 +205,7 @@ def process_image(path):
 
         if name == "person":
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            x1,y1,x2,y2 = map(int, box.xyxy[0])
 
             crop = frame[y1:y2, x1:x2]
 
@@ -261,27 +222,41 @@ def process_image(path):
     return jsonify({
         "male": male,
         "female": female,
-        "unique_people": male + female,
+        "unique_people": male+female,
         "visual_objects": list(object_freq.keys()),
         "content_summary": summary
     })
 
 
-# ================= VIDEO PROCESS (RENDER SAFE) =================
+# ================= VIDEO PROCESS FROM FILE =================
 
 def process_video(path):
 
-    global video_summary
-
     cap = cv2.VideoCapture(path)
+
+    return analyze_video(cap)
+
+
+# ================= VIDEO PROCESS FROM STREAM =================
+
+def process_video_stream(stream_url):
+
+    cap = cv2.VideoCapture(stream_url)
+
+    return analyze_video(cap)
+
+
+# ================= CORE ANALYSIS =================
+
+def analyze_video(cap):
+
+    global video_summary
 
     male = 0
     female = 0
     object_freq = {}
 
     frame_count = 0
-
-    print("Processing video...")
 
     while True:
 
@@ -292,8 +267,7 @@ def process_video(path):
 
         frame_count += 1
 
-        # Render safe optimization
-        if frame_count % 60 != 0:
+        if frame_count % 120 != 0:
             continue
 
         gc.collect()
@@ -307,36 +281,31 @@ def process_video(path):
 
             object_freq[name] = object_freq.get(name, 0) + 1
 
-            if name != "person":
-                continue
+            if name == "person":
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
+                x1,y1,x2,y2 = map(int, box.xyxy[0])
 
-            crop = frame[y1:y2, x1:x2]
+                crop = frame[y1:y2, x1:x2]
 
-            gender = detect_gender(crop)
+                gender = detect_gender(crop)
 
-            if gender == "Man":
-                male += 1
+                if gender == "Man":
+                    male += 1
 
-            elif gender == "Woman":
-                female += 1
+                elif gender == "Woman":
+                    female += 1
 
     cap.release()
 
     summary = generate_scene_summary(male, female, object_freq)
 
     video_summary = {
-
         "male": male,
         "female": female,
-        "unique_people": male + female,
+        "unique_people": male+female,
         "visual_objects": list(object_freq.keys()),
         "content_summary": summary
-
     }
-
-    print("Video processing done")
 
     return jsonify(video_summary)
 
@@ -349,9 +318,7 @@ def chat():
     if not video_summary:
         return jsonify({"reply": "Analyze video first"})
 
-    return jsonify({
-        "reply": video_summary["content_summary"]
-    })
+    return jsonify({"reply": video_summary["content_summary"]})
 
 
 # ================= PDF =================
@@ -363,30 +330,19 @@ def export_pdf():
 
     c = canvas.Canvas(path, pagesize=A4)
 
-    c.drawString(50, 800, "VideoGPT Report")
+    c.drawString(50,800,"VideoGPT Report")
 
-    c.drawString(
-        50,
-        760,
-        video_summary.get("content_summary", "")
-    )
+    c.drawString(50,760,video_summary.get("content_summary",""))
 
     c.save()
 
-    return send_from_directory(
-        UPLOAD_DIR,
-        "report.pdf",
-        as_attachment=True
-    )
+    return send_from_directory(UPLOAD_DIR,"report.pdf",as_attachment=True)
 
 
 # ================= RUN =================
 
 if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT",10000))
 
-    app.run(
-        host="0.0.0.0",
-        port=port
-    )
+    app.run(host="0.0.0.0", port=port)
