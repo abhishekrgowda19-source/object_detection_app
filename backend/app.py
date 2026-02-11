@@ -8,7 +8,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from werkzeug.utils import secure_filename
 
-# ================= PATHS =================
+# ================= PATH SETUP =================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -99,7 +99,7 @@ def generate_scene_summary(male, female, object_freq):
     )
 
 
-# ================= FRONTEND =================
+# ================= FRONTEND ROUTES =================
 
 @app.route("/")
 def home():
@@ -147,25 +147,23 @@ def process():
     except Exception as e:
 
         print("Process error:", e)
+
         return jsonify({"error": str(e)}), 500
 
 
-# ================= YOUTUBE PROCESS (RENDER SAFE) =================
+# ================= YOUTUBE PROCESS (RENDER SAFE FINAL VERSION) =================
 
 @app.route("/process_link", methods=["POST"])
 def process_link():
 
     try:
 
-        data = request.get_json()
+        data = request.get_json(force=True)
 
-        if not data:
-            return jsonify({"error": "No data received"}), 400
-
-        url = data.get("url")
-
-        if not url:
+        if not data or "url" not in data:
             return jsonify({"error": "No URL provided"}), 400
+
+        url = data["url"].strip()
 
         print("Downloading YouTube:", url)
 
@@ -174,26 +172,29 @@ def process_link():
         if os.path.exists(output_path):
             os.remove(output_path)
 
-        # RENDER SAFE SETTINGS
         ydl_opts = {
 
-            "format": "worst[ext=mp4]/worst",
+            "format": "worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst",
 
             "outtmpl": output_path,
 
-            "quiet": True,
-
-            "noplaylist": True,
+            "quiet": False,
 
             "nocheckcertificate": True,
 
-            "ignoreerrors": True,
+            "ignoreerrors": False,
 
-            "no_warnings": True,
+            "no_warnings": False,
 
-            "retries": 3,
+            "noplaylist": True,
 
-            "fragment_retries": 3
+            "retries": 5,
+
+            "fragment_retries": 5,
+
+            "http_chunk_size": 1048576,
+
+            "socket_timeout": 30
 
         }
 
@@ -201,18 +202,21 @@ def process_link():
             ydl.download([url])
 
         if not os.path.exists(output_path):
-            return jsonify({"error": "Download failed"}), 500
+            return jsonify({
+                "error": "Download failed"
+            }), 500
 
-        print("Download complete")
+        print("Download successful")
 
         return process_video(output_path)
 
     except Exception as e:
 
-        print("YouTube error:", e)
+        print("FULL YouTube error:", str(e))
 
         return jsonify({
-            "error": str(e)
+            "error": "YouTube download failed",
+            "details": str(e)
         }), 500
 
 
@@ -263,7 +267,7 @@ def process_image(path):
     })
 
 
-# ================= VIDEO PROCESS =================
+# ================= VIDEO PROCESS (RENDER SAFE) =================
 
 def process_video(path):
 
