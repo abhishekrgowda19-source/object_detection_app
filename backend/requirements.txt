@@ -5,12 +5,13 @@ ultralytics==8.2.103
 opencv-python-headless==4.10.0.84
 
 deepface==0.0.93
-tensorflow-cpu==2.15.0
-tf-keras==2.15.1
+tensorflow-cpu==2.15.1
+tf-keras==2.15.0
 
 yt-dlp==2025.1.26
 
 reportlab==4.2.5
+
 numpy==1.26.4
 pillow==10.4.0
 psutil==6.0.0
